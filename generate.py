@@ -66,7 +66,7 @@ def gemini(prompt, key):
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
            f"{GEMINI_MODEL}:generateContent?key={key}")
     body = json.dumps({"contents": [{"parts": [{"text": prompt}]}],
-                       "generationConfig": {"temperature": 0.4, "maxOutputTokens": 4096}}).encode()
+                       "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192}}).encode()
     req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.load(r)["candidates"][0]["content"]["parts"][0]["text"]
@@ -79,13 +79,18 @@ def build_prompt(now, rows, is_sat):
         for r in rows if not r.get("err"))
     today = now.strftime("%-m/%-d")
     wd = "一二三四五六日"[now.weekday()]
-    mode = ("週六改週報:①本週回顧 ②下週展望與行動劇本 ③深度觀念(8句)" if is_sat else
-            "七節:①今日速覽(3行) ②大盤趨勢與情緒 "
-            "③綜合判讀+行動劇本(溫度計1-10、立場進攻/中性/防守、2-3條基於真實價位的若-則規則、否證條件) "
-            "④持股重點(只挑5檔最需要注意的,各給支撐壓力與參考動作) "
-            "⑤事件提醒 ⑥風險與部位(單一持股≤15%現金≥20%) ⑦今日新知(3句)")
+    mode = ("週六可在開頭加開【本週回顧】一節，其餘同平日" if is_sat else "") + \
+        "務必輸出完整八節，每節標題獨立一行用「━━ 節名 ━━」，節與節之間空一行，內容全部條列一行一重點：" \
+        "━━ 今日速覽 ━━(3-5行：大盤方向、今天最重要一件事、最值得看的一檔) " \
+        "━━ 大盤與情緒 ━━(加權/S&P500/VIX/美元台幣逐項，標多空與乖離；VIX<15自滿15-20正常>25恐慌) " \
+        "━━ 綜合判讀 ━━(溫度計1-10分+兩行理由｜立場:進攻/中性/防守｜2-3條基於真實價位的若-則行動規則｜否證條件) " \
+        "━━ 全持股動態 ━━(下方每一檔自選股都要列不可省略，一行一檔：名稱 現價 漲跌%｜趨勢｜RSI｜支撐(50日線或近期低)｜壓力(52週高)｜參考:續抱/回檔加碼/減碼/觀察；乖離>20%標「勿追設移動停利」；穎崴與旺矽視為同一部位) " \
+        "━━ 事件倒數 ━━(只列高度確信的例行時點如台股每月10日前公布上月營收、美股財報季月份；不確定日期寫「建議查證」，嚴禁編造) " \
+        "━━ 潛力雷達 ━━(從下方數據找2-3個值得研究方向：強勢且乖離尚小、超跌接近支撐、趨勢轉強者，說邏輯與風險；嚴禁捏造不在數據中的消息) " \
+        "━━ 風險與部位 ━━(組合八成集中台灣電子/AI鏈；單一持股≤15%、現金≥20%、乖離>20%移動停利) " \
+        "━━ 今日新知 ━━(3-5句實用觀念，主題輪替)"
     return (f"你是專業投資研究助理,為台灣企金背景的投資人 Ray 產出 {today}(週{wd}) 簡報。"
-            f"直接輸出簡報成品全文,嚴禁包含思考過程、草稿標記(如 Drafting、Section)、前言或任何後設文字,第一行必須是簡報標題;繁體中文;純文字;「━━ 節名 ━━」分節;短行;價位必須由下方真實數據計算,嚴禁捏造;"
+            f"直接輸出簡報成品全文,嚴禁包含思考過程、草稿標記(如 Drafting、Section)、前言或任何後設文字,第一行必須是簡報標題;繁體中文;務必完整輸出全部段落不得中途停止或截斷;純文字;「━━ 節名 ━━」分節;短行;價位必須由下方真實數據計算,嚴禁捏造;"
             f"穎崴與旺矽同屬測試介面視為同一部位;結尾標註(研究參考,非投資建議)。{mode}\n\n真實數據:\n{block}")
 
 
@@ -96,7 +101,7 @@ def main():
     briefing = ""
     if key and now.weekday() != 6:
         try:
-            briefing = gemini(build_prompt(now, rows, now.weekday() == 5), key)
+            briefing = gemini(build_prompt(now, rows, False, key)
         except Exception as e:
             briefing = f"(今日 AI 判讀失敗:{str(e)[:100]}——以下為原始數據,App 內各卡片仍為即時計算)"
     os.makedirs("docs", exist_ok=True)
