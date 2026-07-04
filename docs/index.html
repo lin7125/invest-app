@@ -86,7 +86,7 @@ function vWatch() {
       ${spark(r.spark)}
       <div><div class="px">${r.px.toLocaleString()}</div><div style="text-align:right;font-size:12px">${chg(r.pct)}</div></div>
     </div>
-    <div class="sub"><span>RSI ${r.rsi ?? "—"}</span><span>5֗�線 ${r.ma50.toLocaleString()}</span>
+    <div class="sub"><span>RSI ${r.rsi ?? "—"}</span><span>50日線 ${r.ma50.toLocaleString()}</span>
       <span>200日線 ${r.ma200.toLocaleString()}</span><span>乖離50日 ${r.dev50 > 0 ? "+" : ""}${r.dev50}%</span>
       <span>52週 ${r.lo.toLocaleString()}–${r.hi.toLocaleString()}</span></div></div>`).join("");
   $("#view").innerHTML = h;
