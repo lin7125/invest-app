@@ -101,7 +101,7 @@ def main():
     briefing = ""
     if key and now.weekday() != 6:
         try:
-            briefing = gemini(build_prompt(now, rows, False, key)
+            briefing = gemini(build_prompt(now, rows, False), key)
         except Exception as e:
             briefing = f"(今日 AI 判讀失敗:{str(e)[:100]}——以下為原始數據,App 內各卡片仍為即時計算)"
     os.makedirs("docs", exist_ok=True)
