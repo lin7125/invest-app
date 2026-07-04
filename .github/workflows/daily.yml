@@ -1,0 +1,30 @@
+# 放到倉庫的 .github/workflows/daily.yml
+# 每天台北時間 07:00(UTC 23:00)自動執行;也可在 Actions 頁面手動 Run
+name: daily-briefing
+on:
+  schedule:
+    - cron: '0 23 * * 0-5'   # UTC 週日~週五 23:00 = 台北 週一~週六 07:00
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install yfinance
+      - run: python generate.py
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: 推播通知到手機(ntfy)
+        run: |
+          if [ -n "${{ secrets.NTFY_TOPIC }}" ]; then
+            curl -s -H "Title: 每日投資簡報已更新" -d "打開 App 查看今日判讀與行動劇本" \
+              "https://ntfy.sh/${{ secrets.NTFY_TOPIC }}"
+          fi
+      - name: 提交更新
+        run: |
+          git config user.name bot && git config user.email bot@users.noreply.github.com
+          git add docs/ && git commit -m "briefing $(date +%F)" && git push
