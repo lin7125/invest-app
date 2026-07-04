@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Ray 投資日報</title>
+<style>
+  :root { color-scheme: light dark;
+    --bg:#f5f6f8; --card:#fff; --tx:#111; --mut:#6b7280; --line:#e5e7eb;
+    --up:#dc2626; --dn:#059669; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0e1013; --card:#191c21; --tx:#eee; --mut:#9ca3af; --line:#2a2e35; } }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,"PingFang TC",sans-serif; background:var(--bg); color:var(--tx);
+         padding:14px 14px calc(20px + env(safe-area-inset-bottom)); max-width:720px; margin:0 auto; }
+  h1 { font-size:19px; padding-top:env(safe-area-inset-top); }
+  .upd { color:var(--mut); font-size:12px; margin:2px 0 12px; }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; position:sticky; top:0; background:var(--bg); padding:8px 0; z-index:9; }
+  .tabs button { flex:1; border:1px solid var(--line); background:var(--card); color:var(--tx);
+    border-radius:10px; padding:9px 0; font-size:14px; font-weight:600; }
+  .tabs button.on { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:12px; }
+  .mc { background:var(--card); border-radius:12px; padding:10px 12px; }
+  .mc .t { font-size:11px; color:var(--mut); } .mc .v { font-size:18px; font-weight:700; margin:2px 0; }
+  .up { color:var(--up); } .dn { color:var(--dn); } .mut { color:var(--mut); }
+  .card { background:var(--card); border-radius:12px; padding:12px; margin-bottom:8px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .nm { font-weight:700; font-size:15px; } .cd { color:var(--mut); font-size:11px; margin-left:4px; }
+  .px { font-weight:700; font-size:15px; text-align:right; }
+  .sub { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; font-size:11px; color:var(--mut); }
+  .tag { padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; }
+  .tag.bull { background:rgba(220,38,38,.12); color:var(--up); }
+  .tag.bear { background:rgba(5,150,105,.12); color:var(--dn); }
+  .tag.mix { background:rgba(107,114,128,.15); color:var(--mut); }
+  svg.spark { width:74px; height:26px; }
+  pre.brief { white-space:pre-wrap; font-family:inherit; font-size:14.5px; line-height:1.75;
+    background:var(--card); border-radius:12px; padding:14px; }
+  .hist-item { padding:10px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .foot { color:var(--mut); font-size:11px; text-align:center; margin-top:16px; line-height:1.6; }
+</style>
+</head>
+<body>
+<h1>📈 Ray 投資日報</h1>
+<div class="upd" id="upd">載入中…</div>
+<div class="tabs">
+  <button class="on" data-v="brief">今日簡報</button>
+  <button data-v="watch">持股行情</button>
+  <button data-v="hist">歷史</button>
+</div>
+<div id="view"></div>
+<div class="foot">每個交易日 07:00 自動更新 ・ 下拉重新整理<br>研究參考,非投資建議</div>
+<script>
+let D = null, H = [];
+const $ = s => document.querySelector(s);
+
+function spark(vals) {
+  if (!vals || vals.length < 2) return "";
+  const min = Math.min(...vals), max = Math.max(...vals), rng = max - min || 1;
+  const pts = vals.map((v, i) =>
+    `${(i / (vals.length - 1) * 72 + 1).toFixed(1)},${(24 - (v - min) / rng * 22 + 1).toFixed(1)}`).join(" ");
+  const up = vals[vals.length - 1] >= vals[0];
+  return `<svg class="spark" viewBox="0 0 74 26"><polyline points="${pts}" fill="none"
+    stroke="${up ? "#dc2626" : "#059669"}" stroke-width="1.5"/></svg>`;
+}
+const chg = v => v == null ? '<span class="mut">—</span>'
+  : `<span class="${v > 0.01 ? "up" : v < -0.01 ? "dn" : "mut"}">${v > 0 ? "+" : ""}${v.toFixed(2)}%</span>`;
+const tagCls = t => t === "多頭" ? "bull" : t === "空頭" ? "bear" : "mix";
+
+function vBrief() {
+  const b = (D.briefing || "今日尚未產生簡報").replace(/</g, "&lt;");
+  $("#view").innerHTML = `<pre class="brief">${b}</pre>`;
+}
+function vWatch() {
+  const idx = D.rows.filter(r => r.index && !r.err);
+  const st = D.rows.filter(r => !r.index && !r.err);
+  let h = '<div class="grid">' + idx.map(r => {
+    const fx = r.sym === "USDTWD=X";
+    const v = fx ? r.px.toFixed(2) : r.px.toLocaleString();
+    return `<div class="mc"><div class="t">${r.name}</div><div class="v">${v}</div><div>${chg(r.pct)}</div></div>`;
+  }).join("") + "</div>";
+  h += st.map(r => `<div class="card"><div class="row">
+      <div><span class="nm">${r.name}</span><span class="cd">${r.sym.replace(/\.TWO?$/,"")}</span>
+        <span class="tag ${tagCls(r.trend)}">${r.trend}</span></div>
+      ${spark(r.spark)}
+      <div><div class="px">${r.px.toLocaleString()}</div><div style="text-align:right;font-size:12px">${chg(r.pct)}</div></div>
+    </div>
+    <div class="sub"><span>RSI ${r.rsi ?? "—"}</span><span>5֗�線 ${r.ma50.toLocaleString()}</span>
+      <span>200日線 ${r.ma200.toLocaleString()}</span><span>乖離50日 ${r.dev50 > 0 ? "+" : ""}${r.dev50}%</span>
+      <span>52週 ${r.lo.toLocaleString()}–${r.hi.toLocaleString()}</span></div></div>`).join("");
+  $("#view").innerHTML = h;
+}
+function vHist() {
+  $("#view").innerHTML = H.slice().reverse().map(x =>
+    `<details class="hist-item"><summary>${x.date}</summary><pre class="brief" style="margin-top:8px">${(x.briefing || "").replace(/</g, "&lt;")}</pre></details>`).join("") || "尚無歷史";
+}
+const views = { brief: vBrief, watch: vWatch, hist: vHist };
+document.querySelector(".tabs").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("on"));
+  e.target.classList.add("on"); views[e.target.dataset.v]();
+});
+async function load() {
+  try {
+    const bust = "?t=" + Date.now();
+    D = await (await fetch("data.json" + bust)).json();
+    try { H = await (await fetch("history.json" + bust)).json(); } catch (e) { H = []; }
+    $("#upd").textContent = "更新於 " + D.updated + "(台北時間)";
+    vBrief();
+  } catch (e) { $("#upd").textContent = "資料載入失敗,稍後再試"; }
+}
+load();
+</script>
+</body>
+</html>
